@@ -165,7 +165,7 @@ void showMainWindow() {
     mainLayout->addWidget(outputWindow);
 
     // SSDデバイス名のリスト
-    QStringList ssdDevices = {"/dev/sda2", "/dev/nvme3n1p1", "/dev/nvme5n1p1", "/dev/nvme7n1p1",
+    QStringList ssdDevices = {"/dev/nvme1n1p1", "/dev/nvme3n1p1", "/dev/nvme5n1p1", "/dev/nvme7n1p1",
                               "/dev/nvme9n1p1", "/dev/nvme0n1p1", "/dev/nvme2n1p1", "/dev/nvme4n1p1",
                               "/dev/nvme6n1p1", "/dev/nvme8n1p1"};
 
