@@ -4,6 +4,22 @@
 
 なにかのプロジェクトですね。なにかのシャーシ用です。一体何なんでしょうね。
 
+## LOGICとは
+
+LOGIC: Logger, Optimized, Generating Intelligent Control
+
+
+Logger：記録装置、ロガー（車載データを記録する装置）
+
+Optimized：最適化された
+
+Generating：生成する
+
+Intelligent Control：知能的な制御、インテリジェント制御
+
+
+最適化されたロガーが、知能的な制御を生み出す。
+
 ## プロジェクト構成
 
 ```
