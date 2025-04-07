@@ -8,6 +8,7 @@
 #include <QPushButton>
 #include <QProcess>
 #include <QTextEdit>
+#include <QSplitter>
 #include <QDebug>
 #include <QRegularExpression>
 #include <QDir> // 修正: ディレクトリ操作のために追加
@@ -31,17 +32,19 @@ void showMainWindow() {
     QLabel *selectedSSDLabel = new QLabel("Selected SSD: None", controlArea);
     selectedSSDLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     QFont labelFont = selectedSSDLabel->font();
-    labelFont.setPointSize(20); // フォントサイズを14に設定
+    labelFont.setPointSize(30); // フォントサイズを30に設定
     selectedSSDLabel->setFont(labelFont);
     selectedSSDLabel->setMinimumHeight(40); // 高さを40pxに設定
+    controlLayout->addWidget(selectedSSDLabel);
 
-    // セレクトボックス
+    // セレクトボックス（Pythonスクリプトの選択用）
     QComboBox *scriptSelector = new QComboBox(controlArea);
     scriptSelector->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     QFont comboFont = scriptSelector->font();
-    comboFont.setPointSize(20); // フォントサイズを14に設定
+    comboFont.setPointSize(30); // フォントサイズを30に設定
     scriptSelector->setFont(comboFont);
     scriptSelector->setMinimumHeight(40); // 高さを40pxに設定
+    controlLayout->addWidget(scriptSelector);
 
     // exec_pythonディレクトリ内のPythonファイルを読み取る
     QDir scriptDir(QDir::currentPath() + "/exec_python");
@@ -56,35 +59,56 @@ void showMainWindow() {
     QPushButton *executeButton = new QPushButton("Execute", controlArea);
     executeButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     QFont buttonFont = executeButton->font();
-    buttonFont.setPointSize(20); // フォントサイズを14に設定
+    buttonFont.setPointSize(30); // フォントサイズを30に設定
     executeButton->setFont(buttonFont);
     executeButton->setMinimumHeight(40); // 高さを40pxに設定
+    controlLayout->addWidget(executeButton);
 
     // Exitボタン
     QPushButton *exitButton = new QPushButton("Exit", controlArea);
     exitButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     QFont exitFont = exitButton->font();
-    exitFont.setPointSize(20); // フォントサイズを14に設定
+    exitFont.setPointSize(20); // フォントサイズを20に設定
     exitButton->setFont(exitFont);
     exitButton->setMinimumHeight(40); // 高さを40pxに設定
-
     QObject::connect(exitButton, &QPushButton::clicked, &QApplication::quit);
+    controlLayout->addWidget(exitButton);
 
-    // 下部のテキストウィンドウ（画面の1.5/5）
-    QTextEdit *outputWindow = new QTextEdit(&window);
-    outputWindow->setReadOnly(true); // テキストウィンドウを読み取り専用に設定
-    outputWindow->setFixedHeight(window.height() * 4 / 5); // 高さを画面の4/5に設定
+    // 上部の操作部分をメインレイアウトに追加
+    mainLayout->addWidget(controlArea);
+
+    // 下部のテキストウィンドウ（左右に分割）
+    QSplitter *outputSplitter = new QSplitter(Qt::Horizontal, &window);
+
+    // 左側のテキストウィンドウ（これまでの出力）
+    QTextEdit *leftOutputWindow = new QTextEdit(outputSplitter);
+    leftOutputWindow->setReadOnly(true); // 読み取り専用に設定
+    leftOutputWindow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    leftOutputWindow->setPlaceholderText("Left Output: Previous logs will appear here.");
+
+    // 右側のテキストウィンドウ（Pythonスクリプトの実行に関する出力）
+    QTextEdit *rightOutputWindow = new QTextEdit(outputSplitter);
+    rightOutputWindow->setReadOnly(true); // 読み取り専用に設定
+    rightOutputWindow->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    rightOutputWindow->setPlaceholderText("Right Output: Python execution logs will appear here.");
+
+    // スプリッターをメインレイアウトに追加
+    outputSplitter->setStretchFactor(0, 1); // 左側のウィンドウを優先的に拡大
+    outputSplitter->setStretchFactor(1, 1); // 右側のウィンドウも同じ比率で拡大
+    mainLayout->addWidget(outputSplitter); // テキストボックスを追加
 
     // 実行ボタンのクリックイベント
-    QObject::connect(executeButton, &QPushButton::clicked, [selectedSSDLabel, scriptSelector, outputWindow]() {
+    QObject::connect(executeButton, &QPushButton::clicked, [selectedSSDLabel, scriptSelector, leftOutputWindow, rightOutputWindow]() {
         QString selectedSSD = selectedSSDLabel->text().replace("Selected SSD: ", "");
         QString selectedScript = scriptSelector->currentText();
         QString mountPoint = "null"; // デフォルトでnullを設定
 
         if (selectedSSD == "None") {
-            outputWindow->append("<span style='color: red; font-weight: bold;'>No SSD selected. Please select an SSD first.</span>");
+            // SSDが選択されていない場合のエラーメッセージ
+            leftOutputWindow->append("<span style='color: red; font-weight: bold;'>No SSD selected. Please select an SSD first.</span>");
         } else if (selectedScript == "No scripts found") {
-            outputWindow->append("<span style='color: red; font-weight: bold;'>No script available to execute.</span>");
+            // スクリプトが見つからない場合のエラーメッセージ
+            leftOutputWindow->append("<span style='color: red; font-weight: bold;'>No script available to execute.</span>");
         } else {
             // マウント状況を確認
             QProcess process;
@@ -93,6 +117,7 @@ void showMainWindow() {
             QString output = process.readAllStandardOutput();
 
             if (output.contains(selectedSSD)) {
+                // マウントポイントを取得
                 QRegularExpression regex(QString("%1 on (\\S+)").arg(selectedSSD));
                 QRegularExpressionMatch match = regex.match(output);
                 if (match.hasMatch()) {
@@ -102,67 +127,54 @@ void showMainWindow() {
 
             // 実行するPythonスクリプトと引数をテキストボックスに表示
             QString message = QString("Executing Python script: %1\nArguments: %2").arg(selectedScript, mountPoint);
-            outputWindow->append(message);
+            rightOutputWindow->append(message);
 
             // 実際のスクリプト実行
-            QProcess *scriptProcess = new QProcess(outputWindow); // 親を設定してメモリ管理
+            QProcess *scriptProcess = new QProcess(rightOutputWindow); // 親を設定してメモリ管理
             scriptProcess->setProgram("python3");
             scriptProcess->setArguments({QDir::currentPath() + "/exec_python/" + selectedScript, mountPoint});
             scriptProcess->setProcessChannelMode(QProcess::MergedChannels);
 
-            // 標準出力をリアルタイムでテキストボックスに表示
-            QObject::connect(scriptProcess, &QProcess::readyReadStandardOutput, [scriptProcess, outputWindow]() {
+            // 標準出力をリアルタイムで右側のテキストボックスに表示
+            QObject::connect(scriptProcess, &QProcess::readyReadStandardOutput, [scriptProcess, rightOutputWindow]() {
                 QString scriptOutput = scriptProcess->readAllStandardOutput();
-                outputWindow->append(scriptOutput);
+                rightOutputWindow->append(scriptOutput);
             });
 
-            // エラー出力をリアルタイムでテキストボックスに表示
-            QObject::connect(scriptProcess, &QProcess::readyReadStandardError, [scriptProcess, outputWindow]() {
+            // エラー出力をリアルタイムで右側のテキストボックスに表示
+            QObject::connect(scriptProcess, &QProcess::readyReadStandardError, [scriptProcess, rightOutputWindow]() {
                 QString errorOutput = scriptProcess->readAllStandardError();
-                outputWindow->append("<span style='color: red; font-weight: bold;'>" + errorOutput + "</span>");
+                rightOutputWindow->append("<span style='color: red; font-weight: bold;'>" + errorOutput + "</span>");
             });
 
             // スクリプトの実行開始
             scriptProcess->start();
             if (!scriptProcess->waitForStarted()) {
-                outputWindow->append("<span style='color: red; font-weight: bold;'>Failed to start the script.</span>");
+                rightOutputWindow->append("<span style='color: red; font-weight: bold;'>Failed to start the script.</span>");
             }
 
             // スクリプトの終了時にメッセージを表示
             QObject::connect(scriptProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-                             [scriptProcess, outputWindow](int exitCode, QProcess::ExitStatus exitStatus) {
+                             [scriptProcess, leftOutputWindow, rightOutputWindow](int exitCode, QProcess::ExitStatus exitStatus) {
                                  if (exitStatus == QProcess::NormalExit) {
-                                     outputWindow->append("<span style='color: green; font-weight: bold;'>Script finished with exit code: " + QString::number(exitCode) + "</span>");
+                                     rightOutputWindow->append("<span style='color: green; font-weight: bold;'>Script finished with exit code: " + QString::number(exitCode) + "</span>");
                                  } else {
-                                     outputWindow->append("<span style='color: red; font-weight: bold;'>Script crashed.</span>");
+                                     rightOutputWindow->append("<span style='color: red; font-weight: bold;'>Script crashed.</span>");
                                  }
+
+                                 // 実行結果を左側に移動（Pythonに関する出力は移動しない）
+                                 leftOutputWindow->append("Python script execution completed.");
+
                                  scriptProcess->deleteLater(); // プロセスを削除
                              });
         }
     });
-
-    // レイアウトに追加
-    controlLayout->addWidget(selectedSSDLabel);
-    controlLayout->addWidget(scriptSelector);
-    controlLayout->addWidget(executeButton);
-
-    // 1セル分のスペースを追加
-    QWidget *spacer = new QWidget(controlArea);
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    controlLayout->addWidget(spacer);
-
-    // Exitボタンを追加
-    controlLayout->addWidget(exitButton);
-
-    mainLayout->addWidget(controlArea);
 
     // 上部のSSDセル部分（画面の4/5）
     QWidget *ssdArea = new QWidget(&window);
     QGridLayout *gridLayout = new QGridLayout(ssdArea);
     ssdArea->setFixedHeight(window.height() * 4 / 5); // 高さを画面の4/5に設定
     mainLayout->addWidget(ssdArea);
-
-    mainLayout->addWidget(outputWindow);
 
     // SSDデバイス名のリスト
     QStringList ssdDevices = {"/dev/nvme1n1p1", "/dev/nvme3n1p1", "/dev/nvme5n1p1", "/dev/nvme7n1p1",
@@ -223,24 +235,27 @@ void showMainWindow() {
                 selectButton->setStyleSheet("color: gray;");
             }
 
+            // 「選択」ボタンのクリックイベントを設定
+            QObject::connect(selectButton, &QPushButton::clicked, [deviceName, selectedSSDLabel, leftOutputWindow]() {
+                // 選択したSSDの名前を更新（改行を追加）
+                selectedSSDLabel->setText(QString("Selected SSD:\n%1").arg(deviceName));
+                leftOutputWindow->append("<span style='color: blue; font-weight: bold;'>Selected device: " + deviceName + "</span>");
+            });
+
             // 「マウント/アンマウント」ボタン
             QPushButton *mountButton = new QPushButton("Mount/Unmount", rightWidget);
             mountButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
             // ボタンのクリックイベントを設定
-            QObject::connect(selectButton, &QPushButton::clicked, [deviceName, selectedSSDLabel, outputWindow]() {
-                selectedSSDLabel->setText(QString("Selected SSD: %1").arg(deviceName));
-                outputWindow->append(QString("Selected device: %1").arg(deviceName));
-            });
-
-            QObject::connect(mountButton, &QPushButton::clicked, [deviceName, statusLabel, selectButton, outputWindow]() {
+            QObject::connect(mountButton, &QPushButton::clicked, [deviceName, statusLabel, selectButton, leftOutputWindow]() {
                 QString mountDir = QString("/mnt/%1").arg(deviceName.split('/').last()); // /mnt/にSSD名のディレクトリを作成
 
                 // ディレクトリが存在しない場合は作成
                 QDir dir;
                 if (!dir.exists(mountDir)) {
                     if (!dir.mkpath(mountDir)) {
-                        outputWindow->append("<span style='color: red; font-weight: bold;'>Failed to create mount directory: " + mountDir + "</span>");
+                        // 左側のテキストボックスにエラーメッセージを出力
+                        leftOutputWindow->append("<span style='color: red; font-weight: bold;'>Failed to create mount directory: " + mountDir + "</span>");
                         return;
                     }
                 }
@@ -255,7 +270,8 @@ void showMainWindow() {
                     // マウントされていない場合はマウントを実行
                     int result = QProcess::execute("sudo", {"mount", deviceName, mountDir});
                     if (result == 0) {
-                        outputWindow->append("<span style='color: green; font-weight: bold;'>Mounted " + deviceName + " to " + mountDir + "</span>");
+                        leftOutputWindow->append("<span style='color: green; font-weight: bold;'>Mounted " + deviceName + " to " + mountDir + "</span>");
+                        leftOutputWindow->append("</span>"); // スタイルを閉じる
                         statusLabel->setText(QString("Device: %1\nStatus: Mounted\nMount Point: %2").arg(deviceName, mountDir));
                         statusLabel->setStyleSheet("font-weight: bold; color: green;");
 
@@ -263,13 +279,15 @@ void showMainWindow() {
                         selectButton->setEnabled(true);
                         selectButton->setStyleSheet("");
                     } else {
-                        outputWindow->append("<span style='color: red; font-weight: bold;'>Failed to mount " + deviceName + "</span>");
+                        leftOutputWindow->append("<span style='color: red; font-weight: bold;'>Failed to mount " + deviceName + "</span>");
+                        leftOutputWindow->append("</span>"); // スタイルを閉じる
                     }
                 } else {
                     // マウントされている場合はアンマウントを実行
                     int result = QProcess::execute("sudo", {"umount", deviceName});
                     if (result == 0) {
-                        outputWindow->append("<span style='color: green; font-weight: bold;'>Unmounted " + deviceName + "</span>");
+                        leftOutputWindow->append("<span style='color: green; font-weight: bold;'>Unmounted " + deviceName + "</span>");
+                        leftOutputWindow->append("</span>"); // スタイルを閉じる
                         statusLabel->setText(QString("Device: %1\nStatus: Not Mounted").arg(deviceName));
                         statusLabel->setStyleSheet("font-weight: bold; color: red;");
 
@@ -277,7 +295,8 @@ void showMainWindow() {
                         selectButton->setEnabled(false);
                         selectButton->setStyleSheet("color: gray;");
                     } else {
-                        outputWindow->append("<span style='color: red; font-weight: bold;'>Failed to unmount " + deviceName + "</span>");
+                        leftOutputWindow->append("<span style='color: red; font-weight: bold;'>Failed to unmount " + deviceName + "</span>");
+                        leftOutputWindow->append("</span>"); // スタイルを閉じる
                     }
                 }
             });
