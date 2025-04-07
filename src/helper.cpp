@@ -99,7 +99,7 @@ void showMainWindow() {
 
     // 実行ボタンのクリックイベント
     QObject::connect(executeButton, &QPushButton::clicked, [selectedSSDLabel, scriptSelector, leftOutputWindow, rightOutputWindow]() {
-        QString selectedSSD = selectedSSDLabel->text().replace("Selected SSD: ", "");
+        QString selectedSSD = selectedSSDLabel->text().replace("Selected SSD:\n", "").trimmed(); // 選択されたSSDを取得
         QString selectedScript = scriptSelector->currentText();
         QString mountPoint = "null"; // デフォルトでnullを設定
 
